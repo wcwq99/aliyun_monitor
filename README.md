@@ -9,6 +9,18 @@
 
 ---
 
+## 📺 视频教程
+
+<div align="center">
+  <a href="https://www.bilibili.com/video/BV1b2rfBnEZg/" target="_blank">
+    <img src="https://img.shields.io/badge/Bilibili-观看完整视频教程-FF8EB3?style=for-the-badge&logo=bilibili&logoColor=white" alt="Bilibili Video Tutorial"/>
+  </a>
+  <br>
+  <p><i>📺 点击上方徽章或者 <a href="https://www.bilibili.com/video/BV1b2rfBnEZg/">此链接</a> 观看作者提供的保姆级操作演示与避坑指南。</i></p>
+</div>
+
+---
+
 ## ✨ 核心特性
 
 - 🌍 **双轨支持**：完美支持中国内地账单系统（￥）与国际账单系统（$）。
@@ -38,7 +50,11 @@
 - 获取您接收消息的 Chat ID：[@userinfobot](https://t.me/userinfobot)
 
 ### 2️⃣ 阿里云 RAM 权限设置
-为了安全起见，**强烈建议不要使用主账号**。请前往 [RAM 访问控制](https://ram.console.alibabacloud.com/users) 创建子用户并授予以下系统权限：
+为了安全起见，**强烈建议不要使用主账号**。请前往阿里云 RAM 访问控制台创建子用户并授予系统权限：
+- 🇨🇳 **国内版 RAM 权限设置入口**：👉 [点击进入阿里云国内站 RAM 控制台](https://ram.console.aliyun.com/users)
+- 🌐 **国际版 RAM 权限设置入口**：�� [点击进入阿里云国际站 RAM 控制台](https://ram.console.alibabacloud.com/users)
+
+需要授予的安全权限：
 - `AliyunECSFullAccess`（含开关机与查询权限）
 - `AliyunCDTReadOnlyAccess` 或 `AliyunCDTFullAccess`（查询流量）
 - `AliyunBSSReadOnlyAccess`（查询财务与账单模块）
@@ -52,7 +68,11 @@
 > ⚠️ **如果您是普通的 Linux (如 Ubuntu/Debian) 用户，请直接跳过本节至 "(三) 一键安装"，本节仅适用于脱水版 Alpine 系统。**
 
 1. 登录阿里云实例的 **VNC 控制台**
-2. 复制本项目中 `vnc.sh` 的全量内容。
+2. 复制本项目中 `vnc.sh` 的全量内容。您可以直接一键复制执行以下命令来获取：
+   ```bash
+   wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/vnc.sh
+   ```
+   *(或者前往 GitHub 仓库直接打开 [vnc.sh](https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/vnc.sh) 复制源码全文)*
 3. 将代码 **完整粘贴到 VNC 界面并回车执行**。
 4. 初始完毕后即可按以下默认信息 SSH 远程登录：
    - **用户名**：`root`
@@ -60,7 +80,12 @@
 
 ## （二） Alpine 修复 GRUB 引导并重装 Debian 13 (可选扩展)
 
-> 适用于 **系统无法启动 / GRUB 损坏 / Debian 无法进入** 等进阶场景，使用 `install2.sh`。详见源码。
+> 适用于 **系统无法启动 / GRUB 损坏 / Debian 无法进入** 等进阶场景。通过 **Alpine Linux + chroot** 的方式修复引导并重装 Debian 13。
+
+使用 **root 用户** 登录 Alpine 后，下载并执行脚本：
+```bash
+wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install2.sh | sh
+```
 
 ---
 
@@ -82,7 +107,7 @@ wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/ins
 
 ---
 
-## 🗑️ 卸载
+## ��️ 卸载
 
 ```bash
 wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/uninstall.sh | sh
