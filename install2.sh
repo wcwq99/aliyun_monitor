@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Alpine to Debian 13 (Fixed Extraction & Non-Destructive Version)
 # Auto extract network config -> Static IP install -> Prevent disconnect after reboot
 # -------------------------------------------------------------
@@ -8,15 +8,6 @@ if [ ! -f /bin/bash ]; then
     echo "Installing bash..."
     apk update >/dev/null 2>&1
     apk add bash iproute2 grep gawk ipcalc curl wget >/dev/null 2>&1
-fi
-
-# Ensure we are running in bash even when piped via sh
-if [ -z "${BASH_VERSION:-}" ]; then
-    if [ -t 0 ]; then
-        exec /bin/bash "$0" "$@"
-    else
-        exec /bin/bash -s -- "$@"
-    fi
 fi
 
 set -e
@@ -33,17 +24,29 @@ echo "=== Alpine to Debian 13 Auto Install Script ==="
 echo "Script will extract current IP config for static IP install."
 echo ""
 
-if [ -z "$PORT" ]; then
+read_with_default() {
+    var_name="$1"
+    prompt="$2"
+    default_val="$3"
+    input_val=""
+
     if [ -t 0 ] || [ -t 1 ]; then
-        read -r -p "SSH Port [default 22]: " PORT </dev/tty || true
+        printf "%s" "$prompt" >/dev/tty
+        IFS= read -r input_val </dev/tty || input_val=""
     fi
-    PORT=${PORT:-22}
+
+    if [ -z "$input_val" ]; then
+        input_val="$default_val"
+    fi
+
+    eval "$var_name=\"$input_val\""
+}
+
+if [ -z "$PORT" ]; then
+    read_with_default PORT "SSH Port [default 22]: " "22"
 fi
 if [ -z "$PASSWORD" ]; then
-    if [ -t 0 ] || [ -t 1 ]; then
-        read -r -p "Root Password (NO special chars) [default yiwan123]: " PASSWORD </dev/tty || true
-    fi
-    PASSWORD=${PASSWORD:-yiwan123}
+    read_with_default PASSWORD "Root Password (NO special chars) [default yiwan123]: " "yiwan123"
 fi
 
 echo ""
