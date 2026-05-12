@@ -134,6 +134,9 @@ def get_instance_status(client, instance_id):
 def check_and_act(user, tg_conf, state):
     instance_id = user['instance_id']
     name        = user.get('name', instance_id)
+    if user.get('paused') or user.get('disabled'):
+        logger.info(f"[{name}] 监控已暂停，跳过本轮检查")
+        return
     try:
         client = AcsClient(user['ak'], user['sk'], user['region'])
 

@@ -82,6 +82,13 @@ def main():
             target_id = user.get('instance_id', '').strip()
             target_region = user.get('region', '').strip()
             resgroup = user.get('resgroup', '').strip()
+            if user.get('paused') or user.get('disabled'):
+                user_name = user.get('name', '').strip() or target_id or "Unknown_Device"
+                report_lines.append(
+                    f"👤 *{user_name}* (暂停)\n"
+                    f"   ⏸️ 监控: 已暂停\n"
+                )
+                continue
 
             # [名字显示修复] 优先使用备注，没有则用ID，再没有则用Unknown
             user_name = user.get('name', '').strip()

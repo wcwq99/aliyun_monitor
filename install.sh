@@ -83,7 +83,7 @@ function get_single_user_json() {
     LIMIT=${LIMIT:-180}
 
     # 将构建好的 JSON 字符串赋值给全局变量 (去除了 resgroup，加入了 bill_endpoint 和 currency)
-    CURRENT_USER_JSON="{\"name\": \"$NAME\", \"ak\": \"$AK\", \"sk\": \"$SK\", \"region\": \"$REGION\", \"instance_id\": \"$INSTANCE\", \"traffic_limit\": $LIMIT, \"quota\": 200, \"bill_endpoint\": \"$BILL_ENDPOINT\", \"currency\": \"$CURRENCY\"}"
+    CURRENT_USER_JSON="{\"name\": \"$NAME\", \"ak\": \"$AK\", \"sk\": \"$SK\", \"region\": \"$REGION\", \"instance_id\": \"$INSTANCE\", \"traffic_limit\": $LIMIT, \"quota\": 200, \"bill_endpoint\": \"$BILL_ENDPOINT\", \"currency\": \"$CURRENCY\", \"paused\": false}"
 }
 
 # 完整安装流程 (首次运行)
@@ -182,10 +182,11 @@ function run_manage_menu() {
         echo -e "${YELLOW}已检测到存在配置文件，请选择管理操作：${NC}"
         echo "1) 添加新的监控实例 (Add)"
         echo "2) 删除已有监控实例 (Delete)"
-        echo "3) 更新脚本并重置所有配置 (Update & Reset)"
-        echo "4) 退出脚本 (Exit)"
+        echo "3) 暂停/恢复监控实例 (Pause/Resume)"
+        echo "4) 更新脚本并重置所有配置 (Update & Reset)"
+        echo "5) 退出脚本 (Exit)"
         echo -e "${GREEN}=====================================${NC}"
-        read -p "请输入序号 (1-4): " MENU_OPT
+        read -p "请输入序号 (1-5): " MENU_OPT
 
         case $MENU_OPT in
             1)
@@ -232,6 +233,42 @@ except Exception as e:
 "
                 ;;
             3)
+                echo -e "\n${BLUE}当前监控的实例列表：${NC}"
+                python3 -c "
+import json
+with open('$CONFIG_FILE', 'r') as f:
+    users = json.load(f).get('users', [])
+if not users:
+    print('当前没有配置任何监控实例。')
+else:
+    for i, u in enumerate(users):
+        paused = '已暂停' if u.get('paused') or u.get('disabled') else '运行中'
+        print(f' [{i}] 备注名: {u.get(\"name\")} | 实例ID: {u.get(\"instance_id\")} | 状态: {paused}')
+"
+                echo ""
+                read -p "请输入要切换暂停/恢复的实例序号 (输入 q 取消): " TOGGLE_IDX
+                if [[ "$TOGGLE_IDX" == "q" || -z "$TOGGLE_IDX" ]]; then
+                    continue
+                fi
+                python3 -c "
+import json
+idx = int('$TOGGLE_IDX')
+with open('$CONFIG_FILE', 'r') as f:
+    data = json.load(f)
+try:
+    user = data['users'][idx]
+    paused = bool(user.get('paused') or user.get('disabled'))
+    user['paused'] = not paused
+    user.pop('disabled', None)
+    with open('$CONFIG_FILE', 'w') as f:
+        json.dump(data, f, indent=4)
+    state = '已暂停' if user['paused'] else '已恢复'
+    print(f'\n\033[0;32m✅ 成功切换实例: {user.get(\"name\")} ({user.get(\"instance_id\")}) -> {state}\033[0m')
+except Exception:
+    print(f'\n\033[0;31m❌ 操作失败: 无效的序号 {idx}\033[0m')
+"
+                ;;
+            4)
                 echo -e "${RED}⚠️ 此操作将更新代码并覆盖现有的 config.json！${NC}"
                 read -p "确认要更新并重置配置吗？(y/n): " CONFIRM_REINSTALL
                 if [[ "$CONFIRM_REINSTALL" =~ ^[Yy]$ ]]; then
@@ -239,7 +276,7 @@ except Exception as e:
                     exit 0
                 fi
                 ;;
-            4)
+            5)
                 echo -e "${GREEN}退出脚本。${NC}"
                 exit 0
                 ;;
