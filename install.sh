@@ -6,14 +6,11 @@ if [ -z "${BASH_VERSION:-}" ]; then
     exec bash -c "$(wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install.sh || curl -sS https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install.sh)" bash
 fi
 
-# 管道执行 (wget ... | bash) 时，将 stdin 重定向到终端以支持交互式输入
+# 不允许管道执行，提示用户先下载再运行
 if [ ! -t 0 ]; then
-    if [ -r /dev/tty ]; then
-        exec < /dev/tty
-    else
-        echo "需要交互输入，但当前没有可用终端。请在交互式 shell 中运行此脚本。" >&2
-        exit 1
-    fi
+    echo "请勿使用管道方式执行 (wget ... | bash)。正确用法:" >&2
+    echo "  wget -qO install.sh https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install.sh && bash install.sh" >&2
+    exit 1
 fi
 
 # 定义颜色

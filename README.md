@@ -85,7 +85,7 @@
 
 使用 **root 用户** 登录 Alpine 后，下载并执行脚本：
 ```bash
-wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install2.sh | sh
+wget -qO install2.sh https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install2.sh && bash install2.sh
 ```
 
 ---
@@ -95,10 +95,8 @@ wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install2.
 使用 **root 用户** 在任意连通互联网的 Linux 服务器或所监控的 ECS 本机上执行：
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install.sh | sh
+wget -qO install.sh https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install.sh && bash install.sh
 ```
-
-> 注意：脚本需要交互式终端输入。如在无 TTY 环境中执行，请改为登录交互式 shell 后再运行。
 
 脚本将提供丝滑的交互式配置，自动：
 * 检测并修齐 Python 运行微环境与 Pip 依赖。
@@ -127,7 +125,7 @@ wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install.s
 ## 🗑️ 卸载
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/uninstall.sh | sh
+wget -qO uninstall.sh https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/uninstall.sh && bash uninstall.sh
 ```
 
 ---
