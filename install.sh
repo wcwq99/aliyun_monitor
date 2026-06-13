@@ -6,10 +6,10 @@ if [ -z "${BASH_VERSION:-}" ]; then
     exec bash -c "$(wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install.sh || curl -sS https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install.sh)" bash
 fi
 
-# 确保交互模式下 stdin 来自终端，防止 piped 执行时 read 死循环
+TTY_STDIN=0
 if [ ! -t 0 ]; then
     if [ -r /dev/tty ]; then
-        exec < /dev/tty
+        TTY_STDIN=1
     else
         echo "需要交互输入，但当前没有可用终端。请在交互式 shell 中运行此脚本。"
         exit 1
@@ -35,6 +35,20 @@ CURRENT_USER_JSON=""
 
 json_escape() {
     python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))'
+}
+
+prompt_read() {
+    local __var_name="$1"
+    local __prompt="$2"
+    local __value
+
+    if [ "$TTY_STDIN" -eq 1 ]; then
+        read -r -p "$__prompt" __value < /dev/tty
+    else
+        read -r -p "$__prompt" __value
+    fi
+
+    printf -v "$__var_name" '%s' "$__value"
 }
 
 build_user_json() {
@@ -69,17 +83,17 @@ get_single_user_json() {
     local AK="" SK="" REGION="" INSTANCE="" NAME="" LIMIT="" BILL_ENDPOINT="" CURRENCY=""
 
     echo -e "\n${BLUE}>> 配置阿里云账号/实例信息${NC}"
-    read -p "请输入备注名 (例如 HK-Server): " NAME
+    prompt_read NAME "请输入备注名 (例如 HK-Server): "
 
     echo -e "${CYAN}提示: AccessKey 在 RAM 用户详情页 -> 创建 AccessKey${NC}"
-    read -p "AccessKey ID: " AK
-    read -p "AccessKey Secret: " SK
+    prompt_read AK "AccessKey ID: "
+    prompt_read SK "AccessKey Secret: "
 
     # --- 按实例区分国内外账单体系 ---
     echo -e "\n${CYAN}提示: 请选择该账号所属的阿里云类型 (决定账单查询节点与货币单位)${NC}"
     echo "  1) 国内区 (阿里云中国站，人民币 ￥ 结算)"
     echo "  2) 国际区 (阿里云国际站，美元 $ 结算)"
-    read -p "请选择 (1-2, 默认 1): " ACC_TYPE_OPT
+    prompt_read ACC_TYPE_OPT "请选择 (1-2, 默认 1): "
     if [ "$ACC_TYPE_OPT" = "2" ]; then
         BILL_ENDPOINT="business.ap-southeast-1.aliyuncs.com"
         CURRENCY="\$"
@@ -99,7 +113,7 @@ get_single_user_json() {
     echo "  6) 德国-法兰克福 (eu-central-1)"
     echo "  7) 英国-伦敦 (eu-west-1)"
     echo "  8) 手动输入其他区域代码"
-    read -p "请选择 (1-8): " REGION_OPT
+    prompt_read REGION_OPT "请选择 (1-8): "
 
     case $REGION_OPT in
         1) REGION="cn-hongkong" ;;
@@ -109,13 +123,13 @@ get_single_user_json() {
         5) REGION="us-east-1" ;;
         6) REGION="eu-central-1" ;;
         7) REGION="eu-west-1" ;;
-        *) read -p "请输入 Region ID (如 cn-shanghai): " REGION ;;
+        *) prompt_read REGION "请输入 Region ID (如 cn-shanghai): " ;;
     esac
 
     echo -e "${CYAN}提示: 请前往 ECS 控制台 -> 实例列表 -> 实例 ID 列 (以 i- 开头)${NC}"
-    read -p "ECS 实例 ID: " INSTANCE
+    prompt_read INSTANCE "ECS 实例 ID: "
 
-    read -p "关机阈值 (GB, 默认180): " LIMIT
+    prompt_read LIMIT "关机阈值 (GB, 默认180): "
     LIMIT=${LIMIT:-180}
 
     # 将构建好的 JSON 字符串赋值给全局变量 (去除了 resgroup，加入了 bill_endpoint 和 currency)
@@ -162,8 +176,8 @@ run_full_install() {
     echo -e "\n${BLUE}### 配置 Telegram ###${NC}"
     echo -e "1. 联系 ${CYAN}@BotFather${NC} -> 创建机器人获取 Token"
     echo -e "2. 联系 ${CYAN}@userinfobot${NC} -> 获取您的 Chat ID"
-    read -p "请输入 Telegram Bot Token: " TG_TOKEN
-    read -p "请输入 Telegram Chat ID: " TG_ID
+    prompt_read TG_TOKEN "请输入 Telegram Bot Token: "
+    prompt_read TG_ID "请输入 Telegram Chat ID: "
 
     TG_TOKEN_JSON=$(printf '%s' "$TG_TOKEN" | json_escape)
     TG_ID_JSON=$(printf '%s' "$TG_ID" | json_escape)
@@ -180,7 +194,7 @@ run_full_install() {
         fi
 
         echo ""
-        read -p "是否继续添加第二个账号/实例? (y/n): " CONTIN
+        prompt_read CONTIN "是否继续添加第二个账号/实例? (y/n): "
         if [ "$CONTIN" != "y" ] && [ "$CONTIN" != "Y" ]; then
             break
         fi
@@ -226,7 +240,7 @@ run_manage_menu() {
         echo "4) 更新脚本并重置所有配置 (Update & Reset)"
         echo "5) 退出脚本 (Exit)"
         echo -e "${GREEN}=====================================${NC}"
-        read -p "请输入序号 (1-5): " MENU_OPT
+        prompt_read MENU_OPT "请输入序号 (1-5): "
 
         case $MENU_OPT in
             1)
@@ -254,7 +268,7 @@ else:
         print(f' [{i}] 备注名: {u.get(\"name\")} | 实例ID: {u.get(\"instance_id\")} | 区域: {u.get(\"region\")}')
 "
                 echo ""
-                read -p "请输入要删除的实例序号 (输入 q 取消): " DEL_IDX
+                prompt_read DEL_IDX "请输入要删除的实例序号 (输入 q 取消): "
                 if [ "$DEL_IDX" = "q" ] || [ -z "$DEL_IDX" ]; then
                     continue
                 fi
@@ -286,7 +300,7 @@ else:
         print(f' [{i}] 备注名: {u.get(\"name\")} | 实例ID: {u.get(\"instance_id\")} | 状态: {paused}')
 "
                 echo ""
-                read -p "请输入要切换暂停/恢复的实例序号 (输入 q 取消): " TOGGLE_IDX
+                prompt_read TOGGLE_IDX "请输入要切换暂停/恢复的实例序号 (输入 q 取消): "
                 if [ "$TOGGLE_IDX" = "q" ] || [ -z "$TOGGLE_IDX" ]; then
                     continue
                 fi
@@ -310,7 +324,7 @@ except Exception:
                 ;;
             4)
                 echo -e "${RED}此操作将更新代码并覆盖现有的 config.json!${NC}"
-                read -p "确认要更新并重置配置吗？(y/n): " CONFIRM_REINSTALL
+                prompt_read CONFIRM_REINSTALL "确认要更新并重置配置吗？(y/n): "
                 if [ "$CONFIRM_REINSTALL" = "y" ] || [ "$CONFIRM_REINSTALL" = "Y" ]; then
                     run_full_install
                     exit 0
