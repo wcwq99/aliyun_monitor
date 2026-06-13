@@ -16,10 +16,14 @@ from aliyunsdkecs.request.v20140526.DescribeInstancesRequest import DescribeInst
 try:
     from aliyunsdkcore.vendored.requests.packages.urllib3.util import ssl_
     ssl_.HAS_SNI = True
-except Exception:
-    pass
+except Exception as error:
+    logger = logging.getLogger(__name__)
+    logger.warning("启用 SNI 修补失败: %s", error)
 
 import socket
+
+warnings.filterwarnings("ignore")
+
 # 强制使用 IPv4 避免 IPv6 黑洞
 _orig_getaddrinfo = socket.getaddrinfo
 def _getaddrinfo_ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
@@ -27,9 +31,6 @@ def _getaddrinfo_ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
     ipv4_res = [r for r in res if r[0] == socket.AF_INET]
     return ipv4_res if ipv4_res else res
 socket.getaddrinfo = _getaddrinfo_ipv4_only
-
-import warnings
-warnings.filterwarnings("ignore")
 
 # 配置文件路径
 CONFIG_FILE = '/opt/scripts/config.json'

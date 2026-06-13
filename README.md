@@ -56,7 +56,7 @@
 ### 2️⃣ 阿里云 RAM 权限设置
 为了安全起见，**强烈建议不要使用主账号**。请前往阿里云 RAM 访问控制台创建子用户并授予系统权限：
 - 🇨🇳 **国内版 RAM 权限设置入口**：👉 [点击进入阿里云国内站 RAM 控制台](https://ram.console.aliyun.com/users)
-- 🌐 **国际版 RAM 权限设置入口**：�� [点击进入阿里云国际站 RAM 控制台](https://ram.console.alibabacloud.com/users)
+- 🌐 **国际版 RAM 权限设置入口**：👉 [点击进入阿里云国际站 RAM 控制台](https://ram.console.alibabacloud.com/users)
 
 需要授予的安全权限：
 - `AliyunECSFullAccess`（含开关机与查询权限）
@@ -73,7 +73,7 @@
 
 1. 登录阿里云实例的 **VNC 控制台**
 2. 复制本项目中 `vnc.sh` 的全量内容。您可以直接一键复制执行以下命令来获取：
-前往 GitHub 仓库直接打开 [vnc.sh](https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/vnc.sh) 复制源码全文
+前往 GitHub 仓库直接打开 [vnc.sh](https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/vnc.sh) 复制源码全文
 3. 将代码 **完整粘贴到 VNC 界面并回车执行**。
 4. 初始完毕后即可按以下默认信息 SSH 远程登录：
    - **用户名**：`root`
@@ -85,7 +85,7 @@
 
 使用 **root 用户** 登录 Alpine 后，下载并执行脚本：
 ```bash
-wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install2.sh | sh
+wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install2.sh | sh
 ```
 
 ---
@@ -95,8 +95,10 @@ wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/ins
 使用 **root 用户** 在任意连通互联网的 Linux 服务器或所监控的 ECS 本机上执行：
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install.sh | sh
 ```
+
+> 注意：脚本需要交互式终端输入。如在无 TTY 环境中执行，请改为登录交互式 shell 后再运行。
 
 脚本将提供丝滑的交互式配置，自动：
 * 检测并修齐 Python 运行微环境与 Pip 依赖。
@@ -122,10 +124,10 @@ wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/ins
 
 ---
 
-## ��️ 卸载
+## 🗑️ 卸载
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/uninstall.sh | sh
+wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/uninstall.sh | sh
 ```
 
 ---

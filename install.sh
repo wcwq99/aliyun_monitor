@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# 检测是否通过 bash 执行，否则重新用 bash 执行
+if [ -z "${BASH_VERSION:-}" ]; then
+    echo "此脚本需要 bash 运行，正在重新以 bash 执行..."
+    exec bash -c "$(wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install.sh || curl -sS https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install.sh)" bash
+fi
+
+# 确保交互模式下 stdin 来自终端，防止 piped 执行时 read 死循环
+if [ ! -t 0 ]; then
+    if [ -r /dev/tty ]; then
+        exec < /dev/tty
+    else
+        echo "需要交互输入，但当前没有可用终端。请在交互式 shell 中运行此脚本。"
+        exit 1
+    fi
+fi
+
 # 定义颜色
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -17,6 +33,26 @@ CONFIG_FILE="${TARGET_DIR}/config.json"
 # 全局变量，用于在函数间传递生成的 JSON 数据
 CURRENT_USER_JSON=""
 
+json_escape() {
+    python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))'
+}
+
+build_user_json() {
+    local escaped_name escaped_ak escaped_sk escaped_region escaped_instance escaped_bill_endpoint escaped_currency
+    escaped_name=$(printf '%s' "$NAME" | json_escape)
+    escaped_ak=$(printf '%s' "$AK" | json_escape)
+    escaped_sk=$(printf '%s' "$SK" | json_escape)
+    escaped_region=$(printf '%s' "$REGION" | json_escape)
+    escaped_instance=$(printf '%s' "$INSTANCE" | json_escape)
+    escaped_bill_endpoint=$(printf '%s' "$BILL_ENDPOINT" | json_escape)
+    escaped_currency=$(printf '%s' "$CURRENCY" | json_escape)
+
+    CURRENT_USER_JSON=$(cat <<EOF
+{"name": ${escaped_name}, "ak": ${escaped_ak}, "sk": ${escaped_sk}, "region": ${escaped_region}, "instance_id": ${escaped_instance}, "traffic_limit": ${LIMIT}, "quota": 200, "bill_endpoint": ${escaped_bill_endpoint}, "currency": ${escaped_currency}, "paused": false}
+EOF
+)
+}
+
 echo -e "${BLUE}=============================================================${NC}"
 echo -e "${BLUE}    阿里云 CDT 流量监控 & 日报 一键部署/管理脚本 (修复增强版)  ${NC}"
 echo -e "${BLUE}=============================================================${NC}"
@@ -29,24 +65,24 @@ fi
 # ================= 核心功能函数 =================
 
 # 收集单个用户信息的函数
-function get_single_user_json() {
+get_single_user_json() {
     local AK="" SK="" REGION="" INSTANCE="" NAME="" LIMIT="" BILL_ENDPOINT="" CURRENCY=""
 
     echo -e "\n${BLUE}>> 配置阿里云账号/实例信息${NC}"
     read -p "请输入备注名 (例如 HK-Server): " NAME
-    
-    echo -e "${CYAN}💡 提示: AccessKey 在 RAM 用户详情页 -> 创建 AccessKey${NC}"
+
+    echo -e "${CYAN}提示: AccessKey 在 RAM 用户详情页 -> 创建 AccessKey${NC}"
     read -p "AccessKey ID: " AK
     read -p "AccessKey Secret: " SK
-    
+
     # --- 按实例区分国内外账单体系 ---
-    echo -e "\n${CYAN}💡 提示: 请选择该账号所属的阿里云类型 (决定账单查询节点与货币单位)${NC}"
+    echo -e "\n${CYAN}提示: 请选择该账号所属的阿里云类型 (决定账单查询节点与货币单位)${NC}"
     echo "  1) 国内区 (阿里云中国站，人民币 ￥ 结算)"
     echo "  2) 国际区 (阿里云国际站，美元 $ 结算)"
     read -p "请选择 (1-2, 默认 1): " ACC_TYPE_OPT
-    if [ "$ACC_TYPE_OPT" == "2" ]; then
+    if [ "$ACC_TYPE_OPT" = "2" ]; then
         BILL_ENDPOINT="business.ap-southeast-1.aliyuncs.com"
-        CURRENCY="$"
+        CURRENCY="\$"
     else
         BILL_ENDPOINT="business.aliyuncs.com"
         CURRENCY="¥"
@@ -54,7 +90,7 @@ function get_single_user_json() {
     echo -e "${GREEN}已设置为: 账单节点=$BILL_ENDPOINT | 货币=$CURRENCY${NC}\n"
     # --------------------------------------
 
-    echo -e "${CYAN}💡 提示: 请选择 ECS 实例所在的区域 (输入数字)${NC}"
+    echo -e "${CYAN}提示: 请选择 ECS 实例所在的区域 (输入数字)${NC}"
     echo "  1) 香港 (cn-hongkong)"
     echo "  2) 新加坡 (ap-southeast-1)"
     echo "  3) 日本-东京 (ap-northeast-1)"
@@ -76,18 +112,18 @@ function get_single_user_json() {
         *) read -p "请输入 Region ID (如 cn-shanghai): " REGION ;;
     esac
 
-    echo -e "${CYAN}💡 提示: 请前往 ECS 控制台 -> 实例列表 -> 实例 ID 列 (以 i- 开头)${NC}"
+    echo -e "${CYAN}提示: 请前往 ECS 控制台 -> 实例列表 -> 实例 ID 列 (以 i- 开头)${NC}"
     read -p "ECS 实例 ID: " INSTANCE
-    
+
     read -p "关机阈值 (GB, 默认180): " LIMIT
     LIMIT=${LIMIT:-180}
 
     # 将构建好的 JSON 字符串赋值给全局变量 (去除了 resgroup，加入了 bill_endpoint 和 currency)
-    CURRENT_USER_JSON="{\"name\": \"$NAME\", \"ak\": \"$AK\", \"sk\": \"$SK\", \"region\": \"$REGION\", \"instance_id\": \"$INSTANCE\", \"traffic_limit\": $LIMIT, \"quota\": 200, \"bill_endpoint\": \"$BILL_ENDPOINT\", \"currency\": \"$CURRENCY\", \"paused\": false}"
+    build_user_json
 }
 
 # 完整安装流程 (首次运行)
-function run_full_install() {
+run_full_install() {
     # 1. 目录准备
     if [ ! -d "$TARGET_DIR" ]; then
         mkdir -p "$TARGET_DIR"
@@ -129,11 +165,14 @@ function run_full_install() {
     read -p "请输入 Telegram Bot Token: " TG_TOKEN
     read -p "请输入 Telegram Chat ID: " TG_ID
 
+    TG_TOKEN_JSON=$(printf '%s' "$TG_TOKEN" | json_escape)
+    TG_ID_JSON=$(printf '%s' "$TG_ID" | json_escape)
+
     # 7. 配置阿里云对象
     USERS_JSON=""
     while true; do
         get_single_user_json
-        
+
         if [ -z "$USERS_JSON" ]; then
             USERS_JSON="$CURRENT_USER_JSON"
         else
@@ -142,7 +181,7 @@ function run_full_install() {
 
         echo ""
         read -p "是否继续添加第二个账号/实例? (y/n): " CONTIN
-        if [[ ! "$CONTIN" =~ ^[Yy]$ ]]; then
+        if [ "$CONTIN" != "y" ] && [ "$CONTIN" != "Y" ]; then
             break
         fi
     done
@@ -151,8 +190,8 @@ function run_full_install() {
     cat > "$CONFIG_FILE" <<EOF
 {
     "telegram": {
-        "bot_token": "$TG_TOKEN",
-        "chat_id": "$TG_ID"
+        "bot_token": ${TG_TOKEN_JSON},
+        "chat_id": ${TG_ID_JSON}
     },
     "users": [
         $USERS_JSON
@@ -170,16 +209,17 @@ EOF
     crontab /tmp/cron_clean
     rm /tmp/cron_bk /tmp/cron_clean
 
-    echo -e "\n${GREEN}🎉 安装与配置完成！${NC}"
-    echo -e "您可以使用以下命令手动测试日报发送："
+    echo -e "\n${GREEN}安装与配置完成!${NC}"
+    echo -e "您可以使用以下命令手动测试日报发送:"
     echo -e "${YELLOW}${VENV_DIR}/bin/python ${TARGET_DIR}/report.py${NC}"
 }
 
 # 管理菜单 (二次运行)
-function run_manage_menu() {
+run_manage_menu() {
     while true; do
-        echo -e "\n${GREEN}=====================================${NC}"
-        echo -e "${YELLOW}已检测到存在配置文件，请选择管理操作：${NC}"
+        echo ""
+        echo -e "${GREEN}=====================================${NC}"
+        echo -e "${YELLOW}已检测到存在配置文件，请选择管理操作:${NC}"
         echo "1) 添加新的监控实例 (Add)"
         echo "2) 删除已有监控实例 (Delete)"
         echo "3) 暂停/恢复监控实例 (Pause/Resume)"
@@ -199,10 +239,10 @@ data['users'].append(json.loads('''$CURRENT_USER_JSON'''))
 with open('$CONFIG_FILE', 'w') as f:
     json.dump(data, f, indent=4)
 "
-                echo -e "${GREEN}✅ 实例添加成功！配置文件已更新。${NC}"
+                echo -e "${GREEN}实例添加成功！配置文件已更新。${NC}"
                 ;;
             2)
-                echo -e "\n${BLUE}当前监控的实例列表：${NC}"
+                echo -e "\n${BLUE}当前监控的实例列表:${NC}"
                 python3 -c "
 import json
 with open('$CONFIG_FILE', 'r') as f:
@@ -215,7 +255,7 @@ else:
 "
                 echo ""
                 read -p "请输入要删除的实例序号 (输入 q 取消): " DEL_IDX
-                if [[ "$DEL_IDX" == "q" || -z "$DEL_IDX" ]]; then
+                if [ "$DEL_IDX" = "q" ] || [ -z "$DEL_IDX" ]; then
                     continue
                 fi
                 python3 -c "
@@ -227,13 +267,13 @@ try:
     removed = data['users'].pop(idx)
     with open('$CONFIG_FILE', 'w') as f:
         json.dump(data, f, indent=4)
-    print(f'\n\033[0;32m✅ 成功删除实例: {removed.get(\"name\")} ({removed.get(\"instance_id\")})\033[0m')
+    print(f'\n\033[0;32m成功删除实例: {removed.get(\"name\")} ({removed.get(\"instance_id\")})\033[0m')
 except Exception as e:
-    print(f'\n\033[0;31m❌ 删除失败: 无效的序号 {idx}\033[0m')
+    print(f'\n\033[0;31m删除失败: 无效的序号 {idx}\033[0m')
 "
                 ;;
             3)
-                echo -e "\n${BLUE}当前监控的实例列表：${NC}"
+                echo -e "\n${BLUE}当前监控的实例列表:${NC}"
                 python3 -c "
 import json
 with open('$CONFIG_FILE', 'r') as f:
@@ -247,7 +287,7 @@ else:
 "
                 echo ""
                 read -p "请输入要切换暂停/恢复的实例序号 (输入 q 取消): " TOGGLE_IDX
-                if [[ "$TOGGLE_IDX" == "q" || -z "$TOGGLE_IDX" ]]; then
+                if [ "$TOGGLE_IDX" = "q" ] || [ -z "$TOGGLE_IDX" ]; then
                     continue
                 fi
                 python3 -c "
@@ -263,15 +303,15 @@ try:
     with open('$CONFIG_FILE', 'w') as f:
         json.dump(data, f, indent=4)
     state = '已暂停' if user['paused'] else '已恢复'
-    print(f'\n\033[0;32m✅ 成功切换实例: {user.get(\"name\")} ({user.get(\"instance_id\")}) -> {state}\033[0m')
+    print(f'\n\033[0;32m成功切换实例: {user.get(\"name\")} ({user.get(\"instance_id\")}) -> {state}\033[0m')
 except Exception:
-    print(f'\n\033[0;31m❌ 操作失败: 无效的序号 {idx}\033[0m')
+    print(f'\n\033[0;31m操作失败: 无效的序号 {idx}\033[0m')
 "
                 ;;
             4)
-                echo -e "${RED}⚠️ 此操作将更新代码并覆盖现有的 config.json！${NC}"
+                echo -e "${RED}此操作将更新代码并覆盖现有的 config.json!${NC}"
                 read -p "确认要更新并重置配置吗？(y/n): " CONFIRM_REINSTALL
-                if [[ "$CONFIRM_REINSTALL" =~ ^[Yy]$ ]]; then
+                if [ "$CONFIRM_REINSTALL" = "y" ] || [ "$CONFIRM_REINSTALL" = "Y" ]; then
                     run_full_install
                     exit 0
                 fi

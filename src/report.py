@@ -4,14 +4,17 @@ import warnings
 import os
 import json
 import datetime
+import logging
 import requests
+
+logger = logging.getLogger(__name__)
 
 # 修正 urllib3 在 Python 3.12 下引发的 SNI 丢失问题
 try:
     from aliyunsdkcore.vendored.requests.packages.urllib3.util import ssl_
     ssl_.HAS_SNI = True
-except Exception:
-    pass
+except Exception as error:
+    logger.warning("启用 SNI 修补失败: %s", error)
 
 import socket
 # 强制使用 IPv4 避免 IPv6 黑洞
@@ -31,22 +34,33 @@ except ImportError:
     sys.exit(1)
 
 CONFIG_FILE = '/opt/scripts/config.json'
+LOG_FILE = '/opt/scripts/report.log'
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.FileHandler(LOG_FILE, encoding='utf-8')
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+    logger.addHandler(handler)
 
 def load_config():
     if not os.path.exists(CONFIG_FILE):
+        logger.error("配置文件不存在: %s", CONFIG_FILE)
         sys.exit(1)
     with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def send_tg_report(tg_conf, message):
     if not tg_conf.get('bot_token') or not tg_conf.get('chat_id'):
+        logger.warning("Telegram 配置缺失，跳过日报发送")
         return
     try:
         url = f"https://api.telegram.org/bot{tg_conf['bot_token']}/sendMessage"
         data = {"chat_id": tg_conf['chat_id'], "text": message, "parse_mode": "Markdown"}
-        requests.post(url, json=data, timeout=10)
-    except:
-        pass
+        response = requests.post(url, json=data, timeout=10)
+        response.raise_for_status()
+    except Exception as error:
+        logger.error("Telegram 日报发送失败: %s", error)
 
 def do_common_request(client, domain, version, action, params=None, method='POST', timeout=30, retries=3):
     for attempt in range(1, retries + 1):
@@ -57,18 +71,20 @@ def do_common_request(client, domain, version, action, params=None, method='POST
             request.set_action_name(action)
             request.set_method(method)
             request.set_protocol_type('https')
-            request.set_connect_timeout(5000)   # 连接 5 秒内必须成功，避免黑洞 IP 卡死
-            request.set_read_timeout(15000)      # 读取 15 秒
+            request.set_connect_timeout(5000)
+            request.set_read_timeout(15000)
             if params:
                 for k, v in params.items():
                     request.add_query_param(k, v)
             response = client.do_action_with_exception(request)
             return json.loads(response.decode('utf-8'))
-        except Exception as e:
+        except Exception as error:
             if attempt < retries:
                 import time
+                logger.warning("接口请求失败，准备重试: action=%s domain=%s attempt=%s error=%s", action, domain, attempt, error)
                 time.sleep(2 * attempt)
                 continue
+            logger.error("接口请求失败: action=%s domain=%s error=%s", action, domain, error)
             return None
 
 def main():
