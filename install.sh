@@ -6,12 +6,12 @@ if [ -z "${BASH_VERSION:-}" ]; then
     exec bash -c "$(wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install.sh || curl -sS https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install.sh)" bash
 fi
 
-TTY_STDIN=0
+# 管道执行 (wget ... | bash) 时，将 stdin 重定向到终端以支持交互式输入
 if [ ! -t 0 ]; then
     if [ -r /dev/tty ]; then
-        TTY_STDIN=1
+        exec < /dev/tty
     else
-        echo "需要交互输入，但当前没有可用终端。请在交互式 shell 中运行此脚本。"
+        echo "需要交互输入，但当前没有可用终端。请在交互式 shell 中运行此脚本。" >&2
         exit 1
     fi
 fi
@@ -34,32 +34,18 @@ CONFIG_FILE="${TARGET_DIR}/config.json"
 CURRENT_USER_JSON=""
 
 json_escape() {
-    python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()))'
-}
-
-prompt_read() {
-    local __var_name="$1"
-    local __prompt="$2"
-    local __value
-
-    if [ "$TTY_STDIN" -eq 1 ]; then
-        read -r -p "$__prompt" __value < /dev/tty
-    else
-        read -r -p "$__prompt" __value
-    fi
-
-    printf -v "$__var_name" '%s' "$__value"
+    python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$1"
 }
 
 build_user_json() {
     local escaped_name escaped_ak escaped_sk escaped_region escaped_instance escaped_bill_endpoint escaped_currency
-    escaped_name=$(printf '%s' "$NAME" | json_escape)
-    escaped_ak=$(printf '%s' "$AK" | json_escape)
-    escaped_sk=$(printf '%s' "$SK" | json_escape)
-    escaped_region=$(printf '%s' "$REGION" | json_escape)
-    escaped_instance=$(printf '%s' "$INSTANCE" | json_escape)
-    escaped_bill_endpoint=$(printf '%s' "$BILL_ENDPOINT" | json_escape)
-    escaped_currency=$(printf '%s' "$CURRENCY" | json_escape)
+    escaped_name=$(json_escape "$NAME")
+    escaped_ak=$(json_escape "$AK")
+    escaped_sk=$(json_escape "$SK")
+    escaped_region=$(json_escape "$REGION")
+    escaped_instance=$(json_escape "$INSTANCE")
+    escaped_bill_endpoint=$(json_escape "$BILL_ENDPOINT")
+    escaped_currency=$(json_escape "$CURRENCY")
 
     CURRENT_USER_JSON=$(cat <<EOF
 {"name": ${escaped_name}, "ak": ${escaped_ak}, "sk": ${escaped_sk}, "region": ${escaped_region}, "instance_id": ${escaped_instance}, "traffic_limit": ${LIMIT}, "quota": 200, "bill_endpoint": ${escaped_bill_endpoint}, "currency": ${escaped_currency}, "paused": false}
@@ -83,17 +69,17 @@ get_single_user_json() {
     local AK="" SK="" REGION="" INSTANCE="" NAME="" LIMIT="" BILL_ENDPOINT="" CURRENCY=""
 
     echo -e "\n${BLUE}>> 配置阿里云账号/实例信息${NC}"
-    prompt_read NAME "请输入备注名 (例如 HK-Server): "
+    read -r -p "请输入备注名 (例如 HK-Server): " NAME
 
     echo -e "${CYAN}提示: AccessKey 在 RAM 用户详情页 -> 创建 AccessKey${NC}"
-    prompt_read AK "AccessKey ID: "
-    prompt_read SK "AccessKey Secret: "
+    read -r -p "AccessKey ID: " AK
+    read -r -p "AccessKey Secret: " SK
 
     # --- 按实例区分国内外账单体系 ---
     echo -e "\n${CYAN}提示: 请选择该账号所属的阿里云类型 (决定账单查询节点与货币单位)${NC}"
     echo "  1) 国内区 (阿里云中国站，人民币 ￥ 结算)"
     echo "  2) 国际区 (阿里云国际站，美元 $ 结算)"
-    prompt_read ACC_TYPE_OPT "请选择 (1-2, 默认 1): "
+    read -r -p "请选择 (1-2, 默认 1): " ACC_TYPE_OPT
     if [ "$ACC_TYPE_OPT" = "2" ]; then
         BILL_ENDPOINT="business.ap-southeast-1.aliyuncs.com"
         CURRENCY="\$"
@@ -113,7 +99,7 @@ get_single_user_json() {
     echo "  6) 德国-法兰克福 (eu-central-1)"
     echo "  7) 英国-伦敦 (eu-west-1)"
     echo "  8) 手动输入其他区域代码"
-    prompt_read REGION_OPT "请选择 (1-8): "
+    read -r -p "请选择 (1-8): " REGION_OPT
 
     case $REGION_OPT in
         1) REGION="cn-hongkong" ;;
@@ -123,13 +109,13 @@ get_single_user_json() {
         5) REGION="us-east-1" ;;
         6) REGION="eu-central-1" ;;
         7) REGION="eu-west-1" ;;
-        *) prompt_read REGION "请输入 Region ID (如 cn-shanghai): " ;;
+        *) read -r -p "请输入 Region ID (如 cn-shanghai): " REGION ;;
     esac
 
     echo -e "${CYAN}提示: 请前往 ECS 控制台 -> 实例列表 -> 实例 ID 列 (以 i- 开头)${NC}"
-    prompt_read INSTANCE "ECS 实例 ID: "
+    read -r -p "ECS 实例 ID: " INSTANCE
 
-    prompt_read LIMIT "关机阈值 (GB, 默认180): "
+    read -r -p "关机阈值 (GB, 默认180): " LIMIT
     LIMIT=${LIMIT:-180}
 
     # 将构建好的 JSON 字符串赋值给全局变量 (去除了 resgroup，加入了 bill_endpoint 和 currency)
@@ -176,11 +162,11 @@ run_full_install() {
     echo -e "\n${BLUE}### 配置 Telegram ###${NC}"
     echo -e "1. 联系 ${CYAN}@BotFather${NC} -> 创建机器人获取 Token"
     echo -e "2. 联系 ${CYAN}@userinfobot${NC} -> 获取您的 Chat ID"
-    prompt_read TG_TOKEN "请输入 Telegram Bot Token: "
-    prompt_read TG_ID "请输入 Telegram Chat ID: "
+    read -r -p "请输入 Telegram Bot Token: " TG_TOKEN
+    read -r -p "请输入 Telegram Chat ID: " TG_ID
 
-    TG_TOKEN_JSON=$(printf '%s' "$TG_TOKEN" | json_escape)
-    TG_ID_JSON=$(printf '%s' "$TG_ID" | json_escape)
+    TG_TOKEN_JSON=$(json_escape "$TG_TOKEN")
+    TG_ID_JSON=$(json_escape "$TG_ID")
 
     # 7. 配置阿里云对象
     USERS_JSON=""
@@ -194,7 +180,7 @@ run_full_install() {
         fi
 
         echo ""
-        prompt_read CONTIN "是否继续添加第二个账号/实例? (y/n): "
+        read -r -p "是否继续添加第二个账号/实例? (y/n): " CONTIN
         if [ "$CONTIN" != "y" ] && [ "$CONTIN" != "Y" ]; then
             break
         fi
@@ -240,7 +226,7 @@ run_manage_menu() {
         echo "4) 更新脚本并重置所有配置 (Update & Reset)"
         echo "5) 退出脚本 (Exit)"
         echo -e "${GREEN}=====================================${NC}"
-        prompt_read MENU_OPT "请输入序号 (1-5): "
+        read -r -p "请输入序号 (1-5): " MENU_OPT
 
         case $MENU_OPT in
             1)
@@ -268,7 +254,7 @@ else:
         print(f' [{i}] 备注名: {u.get(\"name\")} | 实例ID: {u.get(\"instance_id\")} | 区域: {u.get(\"region\")}')
 "
                 echo ""
-                prompt_read DEL_IDX "请输入要删除的实例序号 (输入 q 取消): "
+                read -r -p "请输入要删除的实例序号 (输入 q 取消): " DEL_IDX
                 if [ "$DEL_IDX" = "q" ] || [ -z "$DEL_IDX" ]; then
                     continue
                 fi
@@ -300,7 +286,7 @@ else:
         print(f' [{i}] 备注名: {u.get(\"name\")} | 实例ID: {u.get(\"instance_id\")} | 状态: {paused}')
 "
                 echo ""
-                prompt_read TOGGLE_IDX "请输入要切换暂停/恢复的实例序号 (输入 q 取消): "
+                read -r -p "请输入要切换暂停/恢复的实例序号 (输入 q 取消): " TOGGLE_IDX
                 if [ "$TOGGLE_IDX" = "q" ] || [ -z "$TOGGLE_IDX" ]; then
                     continue
                 fi
@@ -324,7 +310,7 @@ except Exception:
                 ;;
             4)
                 echo -e "${RED}此操作将更新代码并覆盖现有的 config.json!${NC}"
-                prompt_read CONFIRM_REINSTALL "确认要更新并重置配置吗？(y/n): "
+                read -r -p "确认要更新并重置配置吗？(y/n): " CONFIRM_REINSTALL
                 if [ "$CONFIRM_REINSTALL" = "y" ] || [ "$CONFIRM_REINSTALL" = "Y" ]; then
                     run_full_install
                     exit 0
