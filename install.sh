@@ -3,7 +3,7 @@
 # 检测是否通过 bash 执行，否则重新用 bash 执行
 if [ -z "${BASH_VERSION:-}" ]; then
     echo "此脚本需要 bash 运行，正在重新以 bash 执行..."
-    exec bash -c "$(wget -qO- https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install.sh || curl -sS https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/install.sh)" bash
+    exec bash -c "$(wget -qO- https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install.sh || curl -sS https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/install.sh)" bash
 fi
 
 # 管道执行 (wget ... | bash) 时，将 stdin 重定向到终端以支持交互式输入
@@ -25,7 +25,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # GitHub 仓库 raw 地址
-REPO_URL="https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/src"
+REPO_URL="https://raw.githubusercontent.com/wcwq99/aliyun_monitor/main/src"
 TARGET_DIR="/opt/scripts"
 VENV_DIR="${TARGET_DIR}/venv"
 CONFIG_FILE="${TARGET_DIR}/config.json"
